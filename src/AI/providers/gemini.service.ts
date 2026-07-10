@@ -17,6 +17,10 @@ import {
   CommitResponseSchema,
 } from '../contracts/commit-response.schema';
 
+import {
+  CommitResponseGeminiSchema,
+} from '../contracts/commit-response.gemini-schema';
+
 @Injectable()
 export class GeminiService implements IAIService {
   constructor(
@@ -47,9 +51,15 @@ export class GeminiService implements IAIService {
         await this.client.models.generateContent({
           model,
           contents: prompt,
-          config: {
+        //   config: {
+        //     responseMimeType: 'application/json',
+        //   },
+        config: {
             responseMimeType: 'application/json',
-          },
+
+            responseSchema:
+                CommitResponseGeminiSchema,
+        }
         });
 
       const latency = Date.now() - start;
