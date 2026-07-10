@@ -25,12 +25,16 @@ import { LoggerModule } from 'nestjs-pino';
 import { AIModule } from './AI/ai.module';
 import { loggerConfig } from './common/logger/logger.config';
 import openAIConfig from './config/openai.config';
+import geminiConfig from './config/gemini.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [openAIConfig],
+      load: [
+            openAIConfig,
+            geminiConfig,
+      ],
     }),
 
     LoggerModule.forRoot(loggerConfig),
