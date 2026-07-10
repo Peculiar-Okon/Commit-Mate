@@ -1,7 +1,7 @@
-import { COMMIT_PROMPT } from './commits/v1.prompt';
+import { COMMIT_PROMPT_V1 } from './commits V1/v1.prompt';
 
 export class PromptBuilder {
   static buildCommitPrompt(diff: string): string {
-    return COMMIT_PROMPT.replace('{{DIFF}}', diff);
+    return COMMIT_PROMPT_V1.replace('{{DIFF}}', diff);
   }
 }
