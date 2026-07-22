@@ -1,0 +1,7 @@
+diff --git a/.editorconfig b/.editorconfig
+@@ -1,4 +1,5 @@
+ root = true
++
+ charset = utf-8
+ indent_style = space
+ indent_size = 2

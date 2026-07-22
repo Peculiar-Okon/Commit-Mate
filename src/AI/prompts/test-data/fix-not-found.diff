@@ -1,0 +1,3 @@
+diff --git a/src/user.service.ts b/src/user.service.ts
+- throw new Error()
++ throw new NotFoundException()

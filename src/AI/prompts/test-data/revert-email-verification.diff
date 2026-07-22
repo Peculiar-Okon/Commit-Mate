@@ -1,0 +1,5 @@
+diff --git a/src/auth.service.ts b/src/auth.service.ts
+@@ -18,4 +18,0 @@
+- await this.mailService.sendVerificationEmail(user);
+-
+- return user;

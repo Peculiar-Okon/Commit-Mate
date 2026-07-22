@@ -1,0 +1,2 @@
+diff --git a/auth.spec.ts b/auth.spec.ts
++ it('should verify email')

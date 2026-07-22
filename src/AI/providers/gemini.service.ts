@@ -40,6 +40,9 @@ export class GeminiService implements IAIService {
     const model =
       this.config.getOrThrow<string>('gemini.model');
 
+    const temperature =
+  this.config.getOrThrow<number>('gemini.temperature');
+
     this.logger.info({
       event: 'ai.request',
       provider: 'gemini',
@@ -55,6 +58,7 @@ export class GeminiService implements IAIService {
         //     responseMimeType: 'application/json',
         //   },
         config: {
+          temperature,
             responseMimeType: 'application/json',
 
             responseSchema:
@@ -67,6 +71,7 @@ export class GeminiService implements IAIService {
       this.logger.info({
         event: 'ai.response',
         provider: 'gemini',
+        temperature,
         model,
         latency,
       });
