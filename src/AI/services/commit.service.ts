@@ -21,20 +21,18 @@ export class CommitService {
   async generateCommit(diff: string) {
     this.logger.info({
       event: 'commit.generation.started',
-        diffLength: diff.length,
+      diffLength: diff.length,
     });
 
     const prompt = PromptBuilder.buildCommitPrompt(diff);
 
-    const response = await this.aiService.generateCommit(prompt);
-
-    const validated = this.validator.validate(response);
+    const commit = await this.aiService.generateCommit(prompt);
 
     this.logger.info({
       event: 'commit.generation.completed',
-      title: validated.title,
+      title: commit.title,
     });
 
-    return validated;
+    return commit;
   }
 }

@@ -11,6 +11,8 @@ import { ZodError } from 'zod';
 
 import { IAIService } from './ai.interface';
 import { GEMINI_CLIENT } from './gemini-client.provider';
+import { GeminiErrorHandler } from './gemini-error.handler';
+import { RetryService } from '../../common/retry/retry.service';
 
 import {
   CommitResponse,
@@ -30,6 +32,8 @@ export class GeminiService implements IAIService {
     private readonly config: ConfigService,
 
     private readonly logger: PinoLogger,
+
+    private readonly retryService: RetryService,
   ) {}
 
   async generateCommit(
@@ -41,7 +45,7 @@ export class GeminiService implements IAIService {
       this.config.getOrThrow<string>('gemini.model');
 
     const temperature =
-  this.config.getOrThrow<number>('gemini.temperature');
+      this.config.getOrThrow<number>('gemini.temperature');
 
     this.logger.info({
       event: 'ai.request',
@@ -50,21 +54,16 @@ export class GeminiService implements IAIService {
     });
 
     try {
-      const response =
-        await this.client.models.generateContent({
+      const response = await this.retryService.execute(() =>
+        this.client.models.generateContent({
           model,
           contents: prompt,
-        //   config: {
-        //     responseMimeType: 'application/json',
-        //   },
-        config: {
-          temperature,
+          config: {
             responseMimeType: 'application/json',
-
-            responseSchema:
-                CommitResponseGeminiSchema,
-        }
-        });
+            responseSchema: CommitResponseGeminiSchema,
+          },
+        }),
+      );
 
       const latency = Date.now() - start;
 
@@ -92,27 +91,12 @@ export class GeminiService implements IAIService {
         event: 'ai.error',
         provider: 'gemini',
         model,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unknown error',
+        promptLength: prompt.length,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       });
 
-      if (error instanceof SyntaxError) {
-        throw new BadGatewayException(
-          'Gemini returned invalid JSON.',
-        );
-      }
-
-      if (error instanceof ZodError) {
-        throw new BadGatewayException(
-          'Gemini response failed schema validation.',
-        );
-      }
-
-      throw new InternalServerErrorException(
-        'Failed to generate commit message.',
-      );
+      GeminiErrorHandler.handle(error);
     }
   }
 }

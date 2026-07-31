@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+} from '@nestjs/common';
+import { ZodError } from 'zod';
+
 import {
   CommitResponse,
   CommitResponseSchema,
@@ -6,17 +11,17 @@ import {
 
 @Injectable()
 export class ResponseValidator {
-  validate(response: CommitResponse): CommitResponse {
-    if (!response.title) {
-      throw new BadRequestException('AI returned an empty commit title.');
-    }
+  validate(response: unknown): CommitResponse {
+    try {
+      return CommitResponseSchema.parse(response);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(
+          'AI returned an invalid commit response.',
+        );
+      }
 
-    if (!Array.isArray(response.description)) {
-      throw new BadRequestException(
-        'AI returned an invalid description array.',
-      );
+      throw error;
     }
-
-    return response;
   }
 }
