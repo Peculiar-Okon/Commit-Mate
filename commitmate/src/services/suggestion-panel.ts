@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ApiService } from './api.service';
+import { GitService } from './git.service';
 
 export interface CommitSuggestion {
     title: string;
@@ -45,7 +46,7 @@ export class SuggestionPanel {
                         await this.regenerateSuggestion();
                         break;
                     case 'accept':
-                        this.acceptSuggestion();
+                        await this.acceptSuggestion();
                         break;
                 }
             }
@@ -565,10 +566,72 @@ export class SuggestionPanel {
         }
     }
 
-    private acceptSuggestion(): void {
-        vscode.window.showInformationMessage(
-            `CommitMate: Suggestion accepted: ${this.suggestion.title}`
+    private async acceptSuggestion(): Promise<void> {
+        const confirmation = await vscode.window.showWarningMessage(
+            `Create this commit?\n\n${this.suggestion.title}`,
+            {
+                modal: true
+            },
+            'Commit',
+            'Cancel'
         );
+
+        if (confirmation !== 'Commit') {
+            return;
+        }
+
+        await this.createCommit(this.suggestion);
+    }
+
+    private async createCommit(
+        suggestion: CommitSuggestion
+    ): Promise<void> {
+
+        const workspaceFolder =
+            vscode.workspace.workspaceFolders?.[0];
+
+        if (!workspaceFolder) {
+            vscode.window.showErrorMessage(
+                'CommitMate: No workspace is open.'
+            );
+            return;
+        }
+
+        const repositoryPath =
+            workspaceFolder.uri.fsPath;
+
+        const gitService =
+            new GitService(repositoryPath);
+
+        try {
+            const hasStagedChanges =
+                await gitService.hasStagedChanges();
+
+            if (!hasStagedChanges) {
+                vscode.window.showWarningMessage(
+                    'CommitMate: There are no staged changes to commit.'
+                );
+                return;
+            }
+
+            await gitService.commit(
+                suggestion.title,
+                suggestion.description
+            );
+
+            vscode.window.showInformationMessage(
+                'CommitMate: Commit created successfully.'
+            );
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : String(error);
+
+            vscode.window.showErrorMessage(
+                `CommitMate: Failed to create commit. ${message}`
+            );
+        }
     }
 
     private escapeHtml(value: string): string {
