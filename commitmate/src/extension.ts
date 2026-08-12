@@ -27,6 +27,8 @@
 
 import * as vscode from 'vscode';
 import { GitService } from './services/git.service';
+import { ApiService } from './services/api.service';
+import { SuggestionPanel } from './services/suggestion-panel';
 
 export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel so logs are always visible
@@ -72,19 +74,27 @@ export function activate(context: vscode.ExtensionContext) {
                 const stagedDiff = await gitService.getStagedDiff();
                 const unstagedDiff = await gitService.getUnstagedDiff();
 
-                const message = [
-                    `Repository: ${repositoryPath}`,
-                    `Staged diff: ${stagedDiff.length} characters`,
-                    `Unstaged diff: ${unstagedDiff.length} characters`,
-                ].join('\n');
+                if (!stagedDiff) {
+                    vscode.window.showWarningMessage(
+                        'CommitMate: No staged changes found. Stage some changes first.'
+                    );
+                    return;
+                }
 
-                vscode.window.showInformationMessage(message);
+                const apiService = new ApiService();
+
+                const result = await apiService.generateCommit(stagedDiff);
+
+                SuggestionPanel.createOrShow({
+                    title: result.title,
+                    description: result.description,
+                }, stagedDiff);
             } catch (error) {
-                outputChannel.appendLine('CommitMate Git error: ' + (error instanceof Error ? error.message : String(error)));
+                outputChannel.appendLine('CommitMate error: ' + (error instanceof Error ? error.message : String(error)));
                 outputChannel.show(true);
 
                 vscode.window.showErrorMessage(
-                    'CommitMate: Failed to read Git changes.'
+                    'CommitMate: Failed to generate commit suggestion.'
                 );
             }
         }
