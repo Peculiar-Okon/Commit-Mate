@@ -1,0 +1,9 @@
+diff --git a/src/auth.service.ts b/src/auth.service.ts
+@@ -24,6 +24,9 @@
++ await this.mailService.sendVerificationEmail(user);
+
+diff --git a/README.md b/README.md
+@@ -8,3 +8,6 @@
++## Email Verification
++
++Users now receive a verification email after signup.

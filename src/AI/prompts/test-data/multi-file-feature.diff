@@ -1,0 +1,16 @@
+diff --git a/src/auth.controller.ts b/src/auth.controller.ts
+@@ -15,6 +15,8 @@
++ @Post('verify-email')
++ verifyEmail() {}
+
+diff --git a/src/auth.service.ts b/src/auth.service.ts
+@@ -40,6 +40,8 @@
++ await this.mailService.sendVerificationEmail(user);
+
+diff --git a/src/mail.service.ts b/src/mail.service.ts
+@@ -12,0 +12,5 @@
++ async sendVerificationEmail(user) {}
+
+diff --git a/src/auth.module.ts b/src/auth.module.ts
+@@ -5,0 +5,2 @@
++ MailModule

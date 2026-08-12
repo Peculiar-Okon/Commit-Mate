@@ -1,0 +1,7 @@
+diff --git a/src/user.service.ts b/src/user.service.ts
+-if(user){
+-const name=user.name;
+-}
++if (user) {
++  const name = user.name;
++}

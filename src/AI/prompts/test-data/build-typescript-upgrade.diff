@@ -1,0 +1,8 @@
+diff --git a/package.json b/package.json
+index 87ab32d..98bc456 100644
+--- a/package.json
++++ b/package.json
+@@ -18,7 +18,7 @@
+- "typescript": "^5.8.2",
++ "typescript": "^5.9.0",
+  "ts-node": "^10.9.2"
