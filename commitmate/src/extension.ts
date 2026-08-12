@@ -29,6 +29,10 @@ import * as vscode from 'vscode';
 import { GitService } from './services/git.service';
 
 export function activate(context: vscode.ExtensionContext) {
+    // Create a dedicated output channel so logs are always visible
+    const outputChannel = vscode.window.createOutputChannel('CommitMate');
+    context.subscriptions.push(outputChannel);
+
     const disposable = vscode.commands.registerCommand(
         'commitmate.generateCommit',
         async () => {
@@ -47,6 +51,15 @@ export function activate(context: vscode.ExtensionContext) {
             const gitService = new GitService(repositoryPath);
 
             try {
+                const isGitRepo = await gitService.isGitRepository();
+
+                if (!isGitRepo) {
+                    vscode.window.showErrorMessage(
+                        'CommitMate: This workspace is not a Git repository.'
+                    );
+                    return;
+                }
+
                 const hasChanges = await gitService.hasChanges();
 
                 if (!hasChanges) {
@@ -59,17 +72,16 @@ export function activate(context: vscode.ExtensionContext) {
                 const stagedDiff = await gitService.getStagedDiff();
                 const unstagedDiff = await gitService.getUnstagedDiff();
 
-                console.log('=== STAGED DIFF ===');
-                console.log(stagedDiff);
+                const message = [
+                    `Repository: ${repositoryPath}`,
+                    `Staged diff: ${stagedDiff.length} characters`,
+                    `Unstaged diff: ${unstagedDiff.length} characters`,
+                ].join('\n');
 
-                console.log('=== UNSTAGED DIFF ===');
-                console.log(unstagedDiff);
-
-                vscode.window.showInformationMessage(
-                    'CommitMate: Git changes detected.'
-                );
+                vscode.window.showInformationMessage(message);
             } catch (error) {
-                console.error('CommitMate Git error:', error);
+                outputChannel.appendLine('CommitMate Git error: ' + (error instanceof Error ? error.message : String(error)));
+                outputChannel.show(true);
 
                 vscode.window.showErrorMessage(
                     'CommitMate: Failed to read Git changes.'

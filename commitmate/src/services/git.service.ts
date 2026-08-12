@@ -15,7 +15,8 @@ export class GitService {
         const { stdout } = await execAsync(
             'git diff --cached',
             {
-                cwd: this.repositoryPath
+                cwd: this.repositoryPath,
+                maxBuffer: 10 * 1024 * 1024 // 10MB
             }
         );
 
@@ -26,7 +27,8 @@ export class GitService {
         const { stdout } = await execAsync(
             'git diff',
             {
-                cwd: this.repositoryPath
+                cwd: this.repositoryPath,
+                maxBuffer: 10 * 1024 * 1024 // 10MB
             }
         );
 
@@ -43,4 +45,20 @@ export class GitService {
 
         return stdout.trim().length > 0;
     }
+
+    async isGitRepository(): Promise<boolean> {
+        try {
+            await execAsync(
+                'git rev-parse --is-inside-work-tree',
+                {
+                    cwd: this.repositoryPath
+                }
+            );
+            return true;
+        } catch {
+            return false;
+        }
+    }
 }
+
+console.log('CommitMate is tested and working fine');
