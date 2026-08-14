@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ApiService } from './api.service';
 import { GitService } from './git.service';
+import { CommitSizeAnalysis } from './commit-analysis.service';
 
 export interface CommitSuggestion {
     title: string;
@@ -13,16 +14,25 @@ export class SuggestionPanel {
     private readonly panel: vscode.WebviewPanel;
     private suggestion: CommitSuggestion;
     private readonly stagedDiff: string;
+    private readonly analysis: CommitSizeAnalysis;
     private editing: boolean = false;
+    private state: 'ready' | 'empty' | 'error' = 'ready';
+    private errorMessage?: string;
 
     private constructor(
         panel: vscode.WebviewPanel,
         suggestion: CommitSuggestion,
-        stagedDiff: string
+        stagedDiff: string,
+        analysis: CommitSizeAnalysis,
+        state: 'ready' | 'empty' | 'error' = 'ready',
+        errorMessage?: string
     ) {
         this.panel = panel;
         this.suggestion = suggestion;
         this.stagedDiff = stagedDiff;
+        this.analysis = analysis;
+        this.state = state;
+        this.errorMessage = errorMessage;
 
         this.panel.webview.html =
             this.getHtmlContent();
@@ -59,8 +69,9 @@ export class SuggestionPanel {
 
     public static createOrShow(
         suggestion: CommitSuggestion,
-        stagedDiff: string
-    ): void {
+        stagedDiff: string,
+        analysis: CommitSizeAnalysis
+    , state: 'ready' | 'empty' | 'error' = 'ready', errorMessage?: string): void {
 
         if (SuggestionPanel.currentPanel) {
             SuggestionPanel.currentPanel.panel.reveal(
@@ -70,8 +81,10 @@ export class SuggestionPanel {
             SuggestionPanel.currentPanel.suggestion = suggestion;
             SuggestionPanel.currentPanel.editing = false;
 
-            SuggestionPanel.currentPanel.panel.webview.html =
-                SuggestionPanel.currentPanel.getHtmlContent();
+            SuggestionPanel.currentPanel.state = state;
+            SuggestionPanel.currentPanel.errorMessage = errorMessage;
+
+            SuggestionPanel.currentPanel.panel.webview.html = SuggestionPanel.currentPanel.getHtmlContent();
 
             return;
         }
@@ -85,12 +98,7 @@ export class SuggestionPanel {
             }
         );
 
-        SuggestionPanel.currentPanel =
-            new SuggestionPanel(
-                panel,
-                suggestion,
-                stagedDiff
-            );
+        SuggestionPanel.currentPanel = new SuggestionPanel(panel, suggestion, stagedDiff, analysis, state, errorMessage);
     }
 
     private getHtmlContent(): string {
@@ -99,25 +107,58 @@ export class SuggestionPanel {
             .join('');
 
         const titleDisplay = this.editing
-            ? `<input
-                id="commitTitle"
-                class="edit-input"
-                value="${this.escapeHtml(this.suggestion.title)}"
-            />`
-            : `<div class="commit-title">
-                ${this.escapeHtml(this.suggestion.title)}
-            </div>`;
+            ? `<input id="commitTitle" class="edit-input" value="${this.escapeHtml(this.suggestion.title)}" />`
+            : `<div class="commit-title">${this.escapeHtml(this.suggestion.title)}</div>`;
 
         const descriptionDisplay = this.editing
-            ? `<textarea
-                id="description"
-                class="edit-textarea"
-            >${this.escapeHtml(this.suggestion.description.join('\n'))}</textarea>`
-            : `<div class="description">
-                <ul>
-                    ${description}
-                </ul>
-            </div>`;
+            ? `<textarea id="description" class="edit-textarea">${this.escapeHtml(this.suggestion.description.join('\n'))}</textarea>`
+            : `<div class="description"><ul>${description}</ul></div>`;
+
+        const analysisSection = `
+            <div class="section analysis-section">
+
+                <div class="label">
+                    Commit Analysis
+                </div>
+
+                <div class="analysis-box ${this.analysis.isLarge ? 'large' : ''}">
+
+                    ${this.analysis.isLarge ? `
+                        <div class="analysis-warning">
+                            <span class="warning-icon" aria-hidden="true">⚠</span>
+                            Large commit detected
+                        </div>
+                    ` : ''}
+
+                    <div class="analysis-grid">
+                        <div class="analysis-item">
+                            <span class="analysis-value">${this.analysis.filesChanged}</span>
+                            <span class="analysis-key">Files changed</span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="analysis-value">${this.analysis.linesAdded}</span>
+                            <span class="analysis-key">Lines added</span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="analysis-value">${this.analysis.linesRemoved}</span>
+                            <span class="analysis-key">Lines removed</span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="analysis-value">${this.analysis.totalChangedLines}</span>
+                            <span class="analysis-key">Total changed</span>
+                        </div>
+                    </div>
+
+                    ${this.analysis.isLarge ? `
+                        <div class="analysis-tip">
+                            Consider splitting this commit into smaller logical changes.
+                        </div>
+                    ` : ''}
+
+                </div>
+
+            </div>
+        `;
 
         const actions = this.editing
             ? `
@@ -157,6 +198,11 @@ export class SuggestionPanel {
                 <meta
                     name="viewport"
                     content="width=device-width, initial-scale=1.0"
+                >
+
+                <meta
+                    http-equiv="Content-Security-Policy"
+                    content="default-src 'none'; style-src ${this.panel.webview.cspSource}; script-src 'unsafe-inline';"
                 >
 
                 <title>CommitMate Suggestion</title>
@@ -199,25 +245,9 @@ export class SuggestionPanel {
                         margin-bottom: 28px;
                     }
 
-                    .brand-mark {
-                        display: grid;
-                        width: 34px;
-                        height: 34px;
-                        place-items: center;
-                        border-radius: 10px;
-                        background: color-mix(in srgb, var(--vscode-button-background) 20%, transparent);
-                        color: var(--vscode-button-background);
-                    }
+                    /* removed brand mark for a cleaner production header */
 
-                    .brand-mark svg {
-                        width: 19px;
-                        height: 19px;
-                        stroke: currentColor;
-                        stroke-width: 1.8;
-                        fill: none;
-                        stroke-linecap: round;
-                        stroke-linejoin: round;
-                    }
+                    .header { gap: 8px; }
 
                     h1 {
                         font-size: 17px;
@@ -248,7 +278,7 @@ export class SuggestionPanel {
                     .commit-title, .description {
                         border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
                         background: var(--vscode-textCodeBlock-background);
-                        box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
+                        box-shadow: 0 1px 2px color-mix(in srgb, #000 6%, transparent);
                     }
 
                     .commit-title {
@@ -348,31 +378,31 @@ export class SuggestionPanel {
 
                     .icon-button {
                         display: inline-grid;
-                        width: 34px;
-                        height: 34px;
+                        width: 40px;
+                        height: 40px;
                         place-items: center;
                         padding: 0;
-                        border: 1px solid transparent;
-                        border-radius: 8px;
+                        border: 1px solid rgba(0,0,0,0.04);
+                        border-radius: 10px;
                         cursor: pointer;
-                        color: var(--vscode-foreground);
-                        background: var(--vscode-button-secondaryBackground);
-                        transition: background 120ms ease, transform 120ms ease;
+                        color: var(--vscode-button-foreground);
+                        background: color-mix(in srgb, var(--vscode-button-secondaryBackground) 88%, var(--vscode-editor-background));
+                        box-shadow: 0 1px 0 color-mix(in srgb, var(--vscode-editor-background) 8%, transparent);
+                        transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
                     }
 
                     .icon-button svg {
-                        width: 17px;
-                        height: 17px;
-                        stroke: currentColor;
-                        stroke-width: 1.8;
-                        fill: none;
-                        stroke-linecap: round;
-                        stroke-linejoin: round;
+                        width: 16px;
+                        height: 16px;
+                        stroke: none;
+                        fill: currentColor;
+                        opacity: 0.95;
                     }
 
                     .icon-button:hover {
-                        background: var(--vscode-button-secondaryHoverBackground);
-                        transform: translateY(-1px);
+                        background: color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 80%, var(--vscode-editor-background));
+                        transform: translateY(-1px) scale(1.02);
+                        box-shadow: 0 4px 12px color-mix(in srgb, var(--vscode-editor-background) 6%, transparent);
                     }
 
                     .icon-button:focus-visible, .edit-input:focus-visible, .edit-textarea:focus-visible {
@@ -395,6 +425,104 @@ export class SuggestionPanel {
                         margin: 0 2px;
                         background: var(--vscode-widget-border, var(--vscode-editorWidget-border));
                     }
+
+                    .analysis-box {
+                        border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+                        background: var(--vscode-textCodeBlock-background);
+                        border-radius: 10px;
+                        padding: 14px 16px;
+                    }
+
+                    .analysis-box.large {
+                        border-color: var(--vscode-inputValidation-warningBorder);
+                    }
+
+                    .analysis-warning {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        margin-bottom: 12px;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        background: color-mix(in srgb, var(--vscode-inputValidation-warningBackground) 30%, transparent);
+                        color: var(--vscode-inputValidation-warningForeground);
+                        font-weight: 600;
+                        font-size: 13px;
+                    }
+
+                    .warning-icon {
+                        font-size: 15px;
+                    }
+
+                    .analysis-grid {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 12px;
+                    }
+
+                    .analysis-item {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                    }
+
+                    .analysis-value {
+                        font-family: var(--vscode-editor-font-family);
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+
+                    .analysis-key {
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        color: var(--vscode-descriptionForeground);
+                    }
+
+                    .analysis-tip {
+                        margin-top: 12px;
+                        padding-top: 12px;
+                        border-top: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+                        font-size: 12px;
+                        color: var(--vscode-descriptionForeground);
+                        line-height: 1.5;
+                    }
+
+                    .empty-state {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 36px 20px;
+                        border: 1px dashed var(--vscode-widget-border, var(--vscode-editorWidget-border));
+                        border-radius: 10px;
+                        color: var(--vscode-descriptionForeground);
+                        text-align: center;
+                        gap: 8px;
+                        background: color-mix(in srgb, var(--vscode-editor-background) 96%, transparent);
+                    }
+
+                    .empty-title {
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: var(--vscode-foreground);
+                    }
+
+                    .empty-desc {
+                        font-size: 13px;
+                        color: var(--vscode-descriptionForeground);
+                        margin: 0 8px;
+                    }
+
+                    .retry-button {
+                        margin-top: 6px;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        border: none;
+                        background: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        cursor: pointer;
+                    }
                 </style>
             </head>
 
@@ -402,9 +530,6 @@ export class SuggestionPanel {
                 <div class="container">
 
                     <header class="header">
-                        <div class="brand-mark" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6M5 6h7M5 18h7"/></svg>
-                        </div>
                         <div>
                             <h1>CommitMate</h1>
                             <p class="subtitle">Generated commit suggestion</p>
@@ -413,25 +538,31 @@ export class SuggestionPanel {
 
                     <div class="section">
 
-                        <div class="label">
-                            Commit
-                        </div>
+                        ${this.state === 'ready' ? `
+                            <div class="label">Commit</div>
+                            ${titleDisplay}
+                        ` : ''}
 
-                        ${titleDisplay}
+                        ${this.state === 'ready' ? `
+                            <div class="label">Description</div>
+                            ${descriptionDisplay}
+                        ` : ''}
+
+                        ${this.state !== 'ready' ? `
+                            <div class="empty-state">
+                                <div class="empty-title">${this.state === 'empty' ? 'No staged changes' : 'Unable to generate suggestion'}</div>
+                                <div class="empty-desc">${this.state === 'empty' ? 'Stage some changes and try again to get a commit suggestion.' : (this.escapeHtml(this.errorMessage || 'Something went wrong while fetching suggestions.'))}</div>
+                                <button id="retry" class="retry-button">Retry</button>
+                            </div>
+                        ` : ''}
+
+                        ${this.state === 'ready' ? analysisSection : ''}
+
+                        ${this.state === 'ready' ? actions : ''}
+
+                        ${this.state !== 'ready' ? `<div style="height:18px"></div>` : ''}
 
                     </div>
-
-                    <div class="section">
-
-                        <div class="label">
-                            Description
-                        </div>
-
-                        ${descriptionDisplay}
-
-                    </div>
-
-                    ${actions}
 
                 </div>
 
@@ -452,6 +583,12 @@ export class SuggestionPanel {
 
                     document
                         .getElementById('regenerate')
+                        ?.addEventListener('click', () => {
+                            vscode.postMessage({ command: 'regenerate' });
+                        });
+
+                    document
+                        .getElementById('retry')
                         ?.addEventListener('click', () => {
                             vscode.postMessage({ command: 'regenerate' });
                         });

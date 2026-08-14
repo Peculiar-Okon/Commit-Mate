@@ -29,6 +29,7 @@ import * as vscode from 'vscode';
 import { GitService } from './services/git.service';
 import { ApiService } from './services/api.service';
 import { SuggestionPanel } from './services/suggestion-panel';
+import { CommitAnalysisService } from './services/commit-analysis.service';
 
 export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel so logs are always visible
@@ -75,20 +76,52 @@ export function activate(context: vscode.ExtensionContext) {
                 const unstagedDiff = await gitService.getUnstagedDiff();
 
                 if (!stagedDiff) {
-                    vscode.window.showWarningMessage(
-                        'CommitMate: No staged changes found. Stage some changes first.'
-                    );
+                    // Show the panel with an empty state so users understand what's missing
+                    const analysisService = new CommitAnalysisService();
+                    const analysis = analysisService.analyzeDiff('');
+
+                    SuggestionPanel.createOrShow({
+                        title: '',
+                        description: []
+                    }, stagedDiff, analysis, 'empty');
+
                     return;
                 }
 
+                const analysisService = new CommitAnalysisService();
+
+                const analysis = analysisService.analyzeDiff(stagedDiff);
+
+                outputChannel.appendLine('=== COMMIT ANALYSIS ===');
+                outputChannel.appendLine(`Files changed: ${analysis.filesChanged}`);
+                outputChannel.appendLine(`Lines added: ${analysis.linesAdded}`);
+                outputChannel.appendLine(`Lines removed: ${analysis.linesRemoved}`);
+                outputChannel.appendLine(`Total changed lines: ${analysis.totalChangedLines}`);
+                outputChannel.appendLine(`Large commit: ${analysis.isLarge}`);
+                outputChannel.appendLine('');
+
                 const apiService = new ApiService();
 
-                const result = await apiService.generateCommit(stagedDiff);
+                let result;
 
-                SuggestionPanel.createOrShow({
-                    title: result.title,
-                    description: result.description,
-                }, stagedDiff);
+                try {
+                    result = await apiService.generateCommit(stagedDiff);
+
+                    SuggestionPanel.createOrShow({
+                        title: result.title,
+                        description: result.description,
+                    }, stagedDiff, analysis, 'ready');
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+
+                    outputChannel.appendLine('CommitMate generate error: ' + message);
+                    outputChannel.show(true);
+
+                    SuggestionPanel.createOrShow({
+                        title: '',
+                        description: []
+                    }, stagedDiff, analysis, 'error', message);
+                }
             } catch (error) {
                 outputChannel.appendLine('CommitMate error: ' + (error instanceof Error ? error.message : String(error)));
                 outputChannel.show(true);
