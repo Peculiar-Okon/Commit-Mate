@@ -202,7 +202,7 @@ export class SuggestionPanel {
 
                 <meta
                     http-equiv="Content-Security-Policy"
-                    content="default-src 'none'; style-src ${this.panel.webview.cspSource}; script-src 'unsafe-inline';"
+                    content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'unsafe-inline';"
                 >
 
                 <title>CommitMate Suggestion</title>
@@ -378,15 +378,15 @@ export class SuggestionPanel {
 
                     .icon-button {
                         display: inline-grid;
-                        width: 40px;
-                        height: 40px;
+                        width: 38px;
+                        height: 38px;
                         place-items: center;
                         padding: 0;
-                        border: 1px solid rgba(0,0,0,0.04);
+                        border: 1px solid transparent;
                         border-radius: 10px;
                         cursor: pointer;
-                        color: var(--vscode-button-foreground);
-                        background: color-mix(in srgb, var(--vscode-button-secondaryBackground) 88%, var(--vscode-editor-background));
+                        color: var(--vscode-foreground);
+                        background: var(--vscode-button-secondaryBackground);
                         box-shadow: 0 1px 0 color-mix(in srgb, var(--vscode-editor-background) 8%, transparent);
                         transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
                     }
@@ -394,15 +394,16 @@ export class SuggestionPanel {
                     .icon-button svg {
                         width: 16px;
                         height: 16px;
-                        stroke: none;
-                        fill: currentColor;
-                        opacity: 0.95;
+                        stroke: currentColor;
+                        stroke-width: 1.6;
+                        fill: none;
+                        stroke-linecap: round;
+                        stroke-linejoin: round;
                     }
 
                     .icon-button:hover {
-                        background: color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 80%, var(--vscode-editor-background));
-                        transform: translateY(-1px) scale(1.02);
-                        box-shadow: 0 4px 12px color-mix(in srgb, var(--vscode-editor-background) 6%, transparent);
+                        background: var(--vscode-button-secondaryHoverBackground);
+                        transform: translateY(-1px);
                     }
 
                     .icon-button:focus-visible, .edit-input:focus-visible, .edit-textarea:focus-visible {
