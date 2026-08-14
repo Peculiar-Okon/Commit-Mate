@@ -1,3 +1,0 @@
-diff --git a/user.service.ts b/user.service.ts
-- function validate(){}
-+ function validateUser(){}
