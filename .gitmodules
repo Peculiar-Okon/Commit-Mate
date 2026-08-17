@@ -1,0 +1,3 @@
+[submodule "commitmate-ai"]
+    path = commitmate-ai
+    url = https://github.com/Peculiar-Okon/CommitMate-AI.git
